@@ -1,5 +1,5 @@
 import streamlit as st
-import pdfplumber
+from pypdf import PdfReader
 import re
 import random
 import time
@@ -13,7 +13,7 @@ st.title("📘 PDF MCQ Exam System")
 st.caption("Permanent wrong-question bank • Mastery learning")
 
 # -------------------------------------------------
-# Extract MCQs (✔ used internally only)
+# Extract MCQs
 # -------------------------------------------------
 def extract_mcqs(text):
     questions = []
@@ -58,10 +58,12 @@ uploaded_file = st.file_uploader(
 # -------------------------------------------------
 if uploaded_file and "questions" not in st.session_state:
     text = ""
-    with pdfplumber.open(uploaded_file) as pdf:
-        for page in pdf.pages:
-            if page.extract_text():
-                text += page.extract_text() + "\n"
+
+    reader = PdfReader(uploaded_file)
+    for page in reader.pages:
+        extracted = page.extract_text()
+        if extracted:
+            text += extracted + "\n"
 
     st.session_state.questions = extract_mcqs(text)
     random.shuffle(st.session_state.questions)
@@ -69,8 +71,8 @@ if uploaded_file and "questions" not in st.session_state:
     st.session_state.score = 0
     st.session_state.start_time = time.time()
 
-    st.session_state.correct_full = set()   # correct in Full Exam
-    st.session_state.wrong_ids = set()      # PERMANENT wrong-question bank
+    st.session_state.correct_full = set()  
+    st.session_state.wrong_ids = set()      
 
 # -------------------------------------------------
 # MAIN LOGIC
@@ -88,7 +90,6 @@ if "questions" in st.session_state:
 
     st.divider()
 
-    # Select questions
     if mode == "📝 Full Exam":
         active_questions = st.session_state.questions
     else:
@@ -101,7 +102,6 @@ if "questions" in st.session_state:
             st.success("🎉 No questions in Wrong Bank yet!")
             st.stop()
 
-    # Display questions
     for q in active_questions:
         q_id = id(q)
         st.subheader(q["question"])
@@ -129,13 +129,11 @@ if "questions" in st.session_state:
             else:
                 st.error("❌ Wrong — try again")
 
-                # 🔒 WRONG BANK IS PERMANENT
                 if mode == "📝 Full Exam":
                     st.session_state.wrong_ids.add(q_id)
 
         st.divider()
 
-    # Restart
     if st.button("🔀 Shuffle & Restart Exam"):
         random.shuffle(st.session_state.questions)
         st.session_state.score = 0
